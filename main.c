@@ -105,3 +105,65 @@ void sort_inventory(int inv[10]) {
     printf("\nСтало:\n");
     show_inventory(inv);
 }
+void print_menu(void) {
+    printf("\n===== Весёлый фермер =====\n");
+    printf("0 — Выйти\n");
+    printf("1 — Посмотреть на часы\n");
+    printf("2 — Поработать\n");
+    printf("3 — Заглянуть в рюкзак\n");
+    printf("4 — Положить предмет\n");
+    printf("5 — Выбросить предмет\n");
+    printf("6 — Убраться в рюкзаке (вариант)\n");
+    printf("===========================\n");
+}
+
+int main(void) {
+    int day  = 1;
+    int hour = 8;
+
+    int inv[10] = { 0, 2, 0, 4, 0, 5, 0, 6, 0, 0 };
+
+    int choice;
+
+    do {
+        print_menu();
+        choice = ask_int(" ");
+
+        switch (choice) {
+            case 0:
+                printf("Прощай и удачного урожая.\n");
+                break;
+
+            case 1:
+                show_clock(day, hour);
+                break;
+
+            case 2:
+                work(&day, &hour);
+                break;
+
+            case 3:
+                show_inventory(inv);
+                break;
+
+            case 4:
+                put_item(inv);
+                break;
+
+            case 5:
+                drop_item(inv);
+                break;
+
+            case 6:
+                sort_inventory(inv);
+                break;
+                
+            default:
+                printf("Такого пункта нет. Выбери из 0-6.\n");
+                break;
+        }
+
+    } while (choice != 0);
+
+    return 0;
+}
