@@ -32,3 +32,27 @@ const char* name_of(int id) {
         default: return " (Такого нету)";
     }
 }
+void show_inventory(const int inv[10]) {
+    for (int i = 0; i < 10; i++) {
+        printf("Слот %d: [%d]%s\n", i, inv[i], name_of(inv[i]));
+    }
+}
+
+void show_clock(int day, int hour) {
+    printf("Сейчас День %d, %02d:00\n", day, hour);
+}
+
+void work(int *day, int *hour) {
+    int h = ask_int("Сколько часов работаем? ");
+
+    if (h <= 0) {
+        printf("Здесь не должно быть таких чисел. Попробуй положительное число.\n");
+        return;
+    }
+
+    int total = *hour + h;
+    *day  += total / 24;
+    *hour  = total % 24;
+
+    printf("Отработали %d ч. День %d, %02d:00\n", h, *day, *hour);
+}
