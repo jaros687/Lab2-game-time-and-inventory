@@ -105,6 +105,26 @@ void sort_inventory(int inv[10]) {
     printf("\nСтало:\n");
     show_inventory(inv);
 }
+void reverse_sort_inventory(int inv[10]) {
+    printf("\nБыло:\n");
+    show_inventory(inv);
+
+    int write = 0;
+    for (int read = 9; read >= 0; read--) {
+        if (inv[read] != 0) {
+            inv[write] = inv[read];
+            write++;
+        }
+    }
+
+    for (int i = write; i < 10; i++) {
+        inv[i] = 0;
+    }
+
+    printf("\nСтало (сжато и перевёрнуто):\n");
+    show_inventory(inv);
+}
+
 void print_menu(void) {
     printf("\n===== Весёлый фермер =====\n");
     printf("0 — Выйти\n");
@@ -114,6 +134,7 @@ void print_menu(void) {
     printf("4 — Положить предмет\n");
     printf("5 — Выбросить предмет\n");
     printf("6 — Убраться в рюкзаке (вариант)\n");
+    printf("7 — перевернуть рюкзак\n"); 
     printf("===========================\n");
 }
 
@@ -158,8 +179,12 @@ int main(void) {
                 sort_inventory(inv);
                 break;
                 
+            case 7:
+                reverse_sort_inventory(inv);
+                break;
+                
             default:
-                printf("Такого пункта нет. Выбери из 0-6.\n");
+                printf("Такого пункта нет. Выбери из 0-7.\n");
                 break;
         }
 
