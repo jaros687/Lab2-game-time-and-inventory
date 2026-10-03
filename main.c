@@ -105,25 +105,21 @@ void sort_inventory(int inv[10]) {
     printf("\nСтало:\n");
     show_inventory(inv);
 }
-void reverse_sort_inventory(int inv[10]) {
+
+void reverse_inventory(int inv[10]) {
     printf("\nБыло:\n");
     show_inventory(inv);
 
-    int write = 0;
-    for (int read = 9; read >= 0; read--) {
-        if (inv[read] != 0) {
-            inv[write] = inv[read];
-            write++;
-        }
+    for (int i = 0; i < 10 / 2; i++) {
+        int tmp      = inv[i];
+        inv[i]       = inv[9 - i];
+        inv[9 - i]   = tmp;
     }
 
-    for (int i = write; i < 10; i++) {
-        inv[i] = 0;
-    }
-
-    printf("\nСтало (сжато и перевёрнуто):\n");
+    printf("\nСтало:\n");
     show_inventory(inv);
 }
+
 
 void print_menu(void) {
     printf("\n===== Весёлый фермер =====\n");
@@ -180,7 +176,7 @@ int main(void) {
                 break;
                 
             case 7:
-                reverse_sort_inventory(inv);
+                reverse_inventory(inv);
                 break;
                 
             default:
