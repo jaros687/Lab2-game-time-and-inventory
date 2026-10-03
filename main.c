@@ -56,3 +56,52 @@ void work(int *day, int *hour) {
 
     printf("Отработали %d ч. День %d, %02d:00\n", h, *day, *hour);
 }
+void put_item(int inv[10]) {
+    int slot = ask_int("В какой слот (0-9)? ");
+
+    if (slot < 0 || slot >= 10) {
+        printf("Такого слота нет. Есть только 0..9.\n");
+        return;
+    }
+
+    int id = ask_int("Какой ID предмета (0-9)? ");
+    if (id < 0 || id > 9) {
+        printf("ID бывает от 0 до 9. Я больше не сделал.\n");
+        return;
+    }
+
+    inv[slot] = id;
+    printf("Ок, в слот %d положили [%d]%s\n", slot, id, name_of(id));
+}
+
+void drop_item(int inv[10]) {
+    int slot = ask_int("Какой слот очистить (0-9)? ");
+
+    if (slot < 0 || slot >= 10) {
+        printf("Нет такого слота.\n");
+        return;
+    }
+
+    inv[slot] = 0;
+    printf("Слот %d теперь пустой.\n", slot);
+}
+
+void sort_inventory(int inv[10]) {
+    printf("\nБыло:\n");
+    show_inventory(inv);
+
+    int write = 0;
+    for (int read = 0; read < 10; read++) {
+        if (inv[read] != 0) {
+            inv[write] = inv[read];
+            write++;
+        }
+    }
+
+    for (int i = write; i < 10; i++) {
+        inv[i] = 0;
+    }
+
+    printf("\nСтало:\n");
+    show_inventory(inv);
+}
