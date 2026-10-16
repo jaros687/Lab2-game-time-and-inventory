@@ -141,9 +141,10 @@ const char* name_of(int id) {
     return item_names[id];
 }
 
-void show_inventory(const int inv[10]) {
-    for (int i = 0; i < 10; i++) {
-        printf("Слот %d: [%d]%s\n", i, inv[i], name_of(inv[i]));
+void show_inventory(const int inv[INV_SIZE]) {
+    printf("\n--- Инвентарь ---\n");
+    for (int i = 0; i < INV_SIZE; i++) {
+        printf("Слот %d: [%d] - %s\n", i, inv[i], name_of(inv[i]));
     }
 }
 
@@ -153,9 +154,12 @@ void show_clock(int day, int hour) {
 
 void work(int *day, int *hour) {
     int h = ask_int("Сколько часов работаем? ");
-
     if (h <= 0) {
         printf("Здесь не должно быть таких чисел. Попробуй положительное число.\n");
+        return;
+    }
+    if (h > 24 * 365) {
+        printf("Слишком много часов за раз. Максимум %d.\n", 24 * 365);
         return;
     }
 
@@ -165,70 +169,92 @@ void work(int *day, int *hour) {
 
     printf("Отработали %d ч. День %d, %02d:00\n", h, *day, *hour);
 }
-void put_item(int inv[10]) {
-    int slot = ask_int("В какой слот (0-9)? ");
 
-    if (slot < 0 || slot >= 10) {
-        printf("Такого слота нет. Есть только 0..9.\n");
+void put_item(int inv[INV_SIZE]) {
+    int slot = ask_int("В какой слот (0-9)? ");
+    if (slot < 0 || slot >= INV_SIZE) {
+        printf("Такого слота нет. Есть только 0..%d.\n", INV_SIZE - 1);
         return;
     }
 
     int id = ask_int("Какой ID предмета (0-9)? ");
-    if (id < 0 || id > 9) {
-        printf("ID бывает от 0 до 9. Я больше не сделал.\n");
+    if (id < 0 || id >= MAX_ITEMS) {
+        printf("ID бывает от 0 до %d.\n", MAX_ITEMS - 1);
         return;
     }
 
     inv[slot] = id;
-    printf("Ок, в слот %d положили [%d]%s\n", slot, id, name_of(id));
+    printf("Ок, в слот %d положили [%d] - %s\n", slot, id, name_of(id));
 }
 
-void drop_item(int inv[10]) {
+void drop_item(int inv[INV_SIZE]) {
     int slot = ask_int("Какой слот очистить (0-9)? ");
-
-    if (slot < 0 || slot >= 10) {
+    if (slot < 0 || slot >= INV_SIZE) {
         printf("Нет такого слота.\n");
         return;
     }
-
     inv[slot] = 0;
     printf("Слот %d теперь пустой.\n", slot);
 }
 
-void sort_inventory(int inv[10]) {
+void sort_inventory(int inv[INV_SIZE]) {
     printf("\nБыло:\n");
     show_inventory(inv);
 
     int write = 0;
-    for (int read = 0; read < 10; read++) {
+    for (int read = 0; read < INV_SIZE; read++) {
         if (inv[read] != 0) {
-            inv[write] = inv[read];
-            write++;
+            inv[write++] = inv[read];
         }
     }
-
-    for (int i = write; i < 10; i++) {
-        inv[i] = 0;
-    }
+    for (int i = write; i < INV_SIZE; i++) inv[i] = 0;
 
     printf("\nСтало:\n");
     show_inventory(inv);
 }
 
-void reverse_inventory(int inv[10]) {
+void reverse_inventory(int inv[INV_SIZE]) {
     printf("\nБыло:\n");
     show_inventory(inv);
 
-    for (int i = 0; i < 10 / 2; i++) {
-        int tmp      = inv[i];
-        inv[i]       = inv[9 - i];
-        inv[9 - i]   = tmp;
+    for (int i = 0; i < INV_SIZE / 2; i++) {
+        int tmp = inv[i];
+        inv[i] = inv[INV_SIZE - 1 - i];
+        inv[INV_SIZE - 1 - i] = tmp;
     }
 
     printf("\nСтало:\n");
     show_inventory(inv);
 }
 
+void find_item_by_name(const int inv[INV_SIZE]) {
+    char query[MAX_NAME_LEN];
+    ask_string("Введите название предмета для поиска: ", query, sizeof(query));
+
+    if (strlen(query) == 0) {
+        printf("Пустая строка — искать нечего.\n");
+        return;
+    }
+
+    int id = find_id_by_name(query);
+    if (id < 0) {
+        printf("Предмет '%s' не найден в каталоге.\n", query);
+        return;
+    }
+
+    printf("Предмет '%s' имеет ID %d. Ищу в рюкзаке...\n", query, id);
+
+    int found = 0;
+    for (int i = 0; i < INV_SIZE; i++) {
+        if (inv[i] == id) {
+            printf("  Найдено в слоте %d\n", i);
+            found = 1;
+        }
+    }
+    if (!found) {
+        printf("  В рюкзаке такого предмета нет.\n");
+    }
+}
 
 void print_menu(const char *farmer_name) {
     printf("\n===== Весёлый фермер: %s =====\n", farmer_name);
