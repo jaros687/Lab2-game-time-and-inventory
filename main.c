@@ -118,11 +118,10 @@ void load_catalog(char *farmer_name) {
         printf("\n[!] Файл '%s' не найден. Использую стандарт.\n",
                ITEMS_FILE);
     } else {
-        printf("\n[+] Предметы загружены из '%s'.\n", ITEMS_FILE);
+        printf("\n[+] Список предметов из '%s'.\n", ITEMS_FILE);
     }
     (void)farmer_name;
 }
-
 
 const char* name_of(int id) {
     if (id < 0 || id >= MAX_ITEMS) return "Неизвестно";
@@ -134,11 +133,6 @@ int find_id_by_name(const char *name) {
         if (strcmp(item_names[i], name) == 0) return i;
     }
     return -1;
-}
-
-const char* name_of(int id) {
-    if (id < 0 || id >= MAX_ITEMS) return "Неизвестно";
-    return item_names[id];
 }
 
 void show_inventory(const int inv[INV_SIZE]) {
@@ -159,7 +153,7 @@ void work(int *day, int *hour) {
         return;
     }
     if (h > 24 * 365) {
-        printf("Слишком много часов за раз. Максимум %d.\n", 24 * 365);
+        printf("Слишком много часов за раз. Нельзя больше чем %d.\n", 24 * 365);
         return;
     }
 
@@ -242,7 +236,7 @@ void find_item_by_name(const int inv[INV_SIZE]) {
         return;
     }
 
-    printf("Предмет '%s' имеет ID %d. Ищу в рюкзаке...\n", query, id);
+    printf("Предмет '%s' имеет ID %d. Ищу в рюкзаке\n", query, id);
 
     int found = 0;
     for (int i = 0; i < INV_SIZE; i++) {
@@ -255,6 +249,104 @@ void find_item_by_name(const int inv[INV_SIZE]) {
         printf("  В рюкзаке такого предмета нет.\n");
     }
 }
+
+void write_diary(const char *farmer_name, int day, int hour,
+                 const int inv[INV_SIZE]) {
+    FILE *f = fopen(DIARY_FILE, "a");
+    if (!f) {
+        printf("[!] Не удалось открыть '%s' для записи.\n", DIARY_FILE);
+        return;
+    }
+
+    fprintf(f, "========================================\n");
+    fprintf(f, "Фермер: %s\n", farmer_name);
+    fprintf(f, "День %d, %02d:00\n", day, hour);
+    fprintf(f, "Инвентарь:\n");
+    for (int i = 0; i < INV_SIZE; i++) {
+        fprintf(f, "  Слот %d: [%d] - %s\n", i, inv[i], name_of(inv[i]));
+    }
+    fprintf(f, "========================================\n\n");
+
+    fclose(f);
+    printf("[+] Состояние записано в '%s'.\n", DIARY_FILE);
+}
+
+int process_supplies(void) {
+    FILE *in = fopen(INPUT_FILE, "r");
+    if (!in) {
+        printf("[!] Файл '%s' не найден. Создайте его и повторите.\n",
+               INPUT_FILE);
+        return -1;
+    }
+
+    char  names[MAX_SUPPLIES][MAX_SUPPLY_NAME];
+    long  counts[MAX_SUPPLIES];
+    int   total = 0;
+
+    char line[256];
+    int line_no = 0;
+
+    while (fgets(line, sizeof(line), in)) {
+        line_no++;
+
+        char *p = line;
+        while (*p && isspace((unsigned char)*p)) p++;
+        if (*p == '\0') continue;
+
+        char name[MAX_SUPPLY_NAME];
+        long amount;
+        int parsed = sscanf(p, "%63s %ld", name, &amount);
+
+        if (parsed != 2 || amount < 0) {
+            printf("[!] Строка %d пропущена (неверный формат): %s",
+                   line_no, line);
+            continue;
+        }
+
+        if (total >= MAX_SUPPLIES) {
+            printf("[!] Достигнут лимит поставок (%d). Остальные пропущены.\n",
+                   MAX_SUPPLIES);
+            break;
+        }
+
+        int found = -1;
+        for (int i = 0; i < total; i++) {
+            if (strcmp(names[i], name) == 0) { found = i; break; }
+        }
+
+        if (found >= 0) {
+            counts[found] += amount;
+        } else {
+            strncpy(names[total], name, MAX_SUPPLY_NAME - 1);
+            names[total][MAX_SUPPLY_NAME - 1] = '\0';
+            counts[total] = amount;
+            total++;
+        }
+    }
+    fclose(in);
+
+    printf("\n--- Сводная ведомость поставок ---\n");
+    for (int i = 0; i < total; i++) {
+        printf("%s: %ld шт.\n", names[i], counts[i]);
+    }
+    if (total == 0) printf("(нет данных)\n");
+
+    FILE *out = fopen(OUTPUT_FILE, "w");
+    if (!out) {
+        printf("[!] Не удалось открыть '%s' для записи.\n", OUTPUT_FILE);
+        return -1;
+    }
+    fprintf(out, "Сводная ведомость поставок за неделю\n");
+    fprintf(out, "------------------------------------\n");
+    for (int i = 0; i < total; i++) {
+        fprintf(out, "%s: %ld шт.\n", names[i], counts[i]);
+    }
+    fclose(out);
+    printf("[+] Результат записан в '%s'.\n", OUTPUT_FILE);
+
+    return 0;
+}
+
 
 void print_menu(const char *farmer_name) {
     printf("\n===== Весёлый фермер: %s =====\n", farmer_name);
@@ -273,7 +365,6 @@ void print_menu(const char *farmer_name) {
     printf("===========================\n");
 }
 
-/* ============ MAIN ============ */
 int main(void) {
     char farmer_name[MAX_NAME_LEN] = "Безымянный";
     int  day  = 1;
