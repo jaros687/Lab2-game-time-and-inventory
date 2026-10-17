@@ -87,7 +87,7 @@ int load_item_names_from_file(const char *filename) {
     char line[MAX_NAME_LEN];
     int idx = 0;
     while (idx < MAX_ITEMS && fgets(line, sizeof(line), f)) {
-        /* убираем \n и \r */
+        
         size_t len = strlen(line);
         while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) {
             line[--len] = '\0';
