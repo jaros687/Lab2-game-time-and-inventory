@@ -28,6 +28,8 @@
 #define CH_ROCK            'R'
 #define CH_HERO            '@'
 #define CH_TRAP_SHOWN      ','
+#define CH_STAIRS_UP       'U'
+#define CH_STAIRS_DOWN     'D'
 
 #define OBSTACLE_CHANCE_MIN  15
 #define OBSTACLE_CHANCE_MAX  30
@@ -36,10 +38,11 @@
 #define TRAP_COLLAPSE_PCT    50
 
 enum {
-    MOVE_UNKNOWN  = -1,
-    MOVE_BLOCKED  =  0,
-    MOVE_OK       =  1,
-    MOVE_COLLAPSE =  2
+    MOVE_UNKNOWN   = -1,
+    MOVE_BLOCKED   =  0,
+    MOVE_OK        =  1,
+    MOVE_STAIRS_UP =  2,
+    MOVE_COLLAPSE  =  3
 };
 
 char item_names[MAX_ITEMS][MAX_NAME_LEN];
@@ -116,28 +119,33 @@ void set_default_item_names(void) {
 int load_item_names_from_file(const char *filename) {
     FILE *f = fopen(filename, "r");
     if (!f) return -1;
-
-    char line[MAX_NAME_LEN];
+    char tmp[MAX_ITEMS][MAX_NAME_LEN];
+    char line[MAX_NAME_LEN * 2];
     int idx = 0;
+
     while (idx < MAX_ITEMS && fgets(line, sizeof(line), f)) {
         size_t len = strlen(line);
-        while (len > 0 && (line[len-1] == '\n' || line[len-1] == '\r')) {
+
+        if (len > 0 && line[len - 1] != '\n' && !feof(f)) {
+            clear_input();
+        }
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
             line[--len] = '\0';
         }
         if (len == 0) continue;
 
-        strncpy(item_names[idx], line, MAX_NAME_LEN - 1);
-        item_names[idx][MAX_NAME_LEN - 1] = '\0';
+        strncpy(tmp[idx], line, MAX_NAME_LEN - 1);
+        tmp[idx][MAX_NAME_LEN - 1] = '\0';
         idx++;
     }
     fclose(f);
 
-    if (idx < MAX_ITEMS) {
-        char backup[MAX_ITEMS][MAX_NAME_LEN];
-        memcpy(backup, item_names, sizeof(backup));
-        set_default_item_names();
+    if (idx == MAX_ITEMS) {
+        memcpy(item_names, tmp, sizeof(item_names));
+    } else {
+
         for (int i = 0; i < idx; i++) {
-            strncpy(item_names[i], backup[i], MAX_NAME_LEN - 1);
+            strncpy(item_names[i], tmp[i], MAX_NAME_LEN - 1);
             item_names[i][MAX_NAME_LEN - 1] = '\0';
         }
     }
@@ -261,7 +269,7 @@ void find_item_by_name(const int inv[INV_SIZE]) {
         return;
     }
 
-    printf("Предмет '%s' имеет ID %d. Ищу в рюкзаке\n", query, id);
+    printf("Предмет '%s' имеет ID %d. Ищу в рюкзаке.\n", query, id);
 
     int found = 0;
     for (int i = 0; i < INV_SIZE; i++) {
@@ -316,8 +324,7 @@ int process_supplies(void) {
 
         char name[MAX_SUPPLY_NAME];
         long amount;
-        char extra;
-        int parsed = sscanf(p, "%63s %ld %c", name, &amount, &extra);
+        int parsed = sscanf(p, "%63s %ld", name, &amount);
 
         if (parsed != 2 || amount < 0) {
             printf("[!] Строка %d пропущена (неверный формат): %s",
@@ -369,6 +376,7 @@ int process_supplies(void) {
 }
 
 static int rand_in(int lo, int hi) {
+    if (hi < lo) return lo;
     return lo + rand() % (hi - lo + 1);
 }
 
@@ -463,15 +471,19 @@ void place_traps(char **map, bool **traps, int h, int w) {
     }
 }
 
-int find_free_cell(char **map, int h, int w, int *hx, int *hy) {
+int find_free_cell(char **map, bool **traps, int h, int w, int *hx, int *hy) {
     for (int attempt = 0; attempt < 200; attempt++) {
         int x = rand_in(1, w - 2);
         int y = rand_in(1, h - 2);
-        if (map[y][x] == CH_FLOOR) { *hx = x; *hy = y; return 1; }
+        if (map[y][x] == CH_FLOOR && !traps[y][x]) {
+            *hx = x; *hy = y; return 1;
+        }
     }
     for (int y = 1; y < h - 1; y++)
         for (int x = 1; x < w - 1; x++)
-            if (map[y][x] == CH_FLOOR) { *hx = x; *hy = y; return 1; }
+            if (map[y][x] == CH_FLOOR && !traps[y][x]) {
+                *hx = x; *hy = y; return 1;
+            }
     return 0;
 }
 
@@ -483,12 +495,18 @@ void draw_map(char **map, int h, int w, int hx, int hy) {
         }
         putchar('\n');
     }
-    printf("Герой на (%d, %d). Размер %dx%d.\n", hx, hy, w, h);
+
+    printf("Герой на (%d, %d). Размер %dx%d.", hx, hy, w, h);
+    if (map[hy][hx] == CH_STAIRS_DOWN) printf(" [на D — можно Q]");
+    if (map[hy][hx] == CH_STAIRS_UP)   printf(" [на U — шаг вверх]");
+    putchar('\n');
 }
 
 static int cell_passable(char **map, int h, int w, int x, int y) {
     if (x < 0 || x >= w || y < 0 || y >= h) return 0;
-    return map[y][x] == CH_FLOOR || map[y][x] == CH_TRAP_SHOWN;
+    char c = map[y][x];
+    return c == CH_FLOOR || c == CH_TRAP_SHOWN
+        || c == CH_STAIRS_UP || c == CH_STAIRS_DOWN;
 }
 
 int try_move(char **map, bool **traps, int h, int w,
@@ -508,11 +526,11 @@ int try_move(char **map, bool **traps, int h, int w,
     if (traps[ny][nx]) {
         if (map[ny][nx] == CH_FLOOR) {
             map[ny][nx] = CH_TRAP_SHOWN;
-            printf("Осторожно, ипучий пол!\n");
+            printf("Осторожно, скрипучий пол!\n");
         } else {
-            if (rand_in(1, 100) <= TRAP_COLLAPSE_PCT) {
-                printf("Пол с треском ломается! Падаешь на этаж ниже...(Все заново, наверное)\n");
-                return MOVE_COLLAPSE;
+          if (rand_in(1, 100) <= TRAP_COLLAPSE_PCT) {
+            printf("Пол с треском ломается! Падаешь на этаж ниже...(Все заново, наверное)\n");
+            return MOVE_COLLAPSE;
             }
             printf("Пол скрипит!\n");
         }
@@ -520,6 +538,8 @@ int try_move(char **map, bool **traps, int h, int w,
 
     *hx = nx;
     *hy = ny;
+
+    if (map[ny][nx] == CH_STAIRS_UP) return MOVE_STAIRS_UP;
     return MOVE_OK;
 }
 
@@ -528,6 +548,7 @@ typedef struct {
     bool **traps;
     int    h, w;
     int    hx, hy;
+    int    ux, uy;
 } Floor;
 
 static int floor_init(Floor *f) {
@@ -541,15 +562,31 @@ static int floor_init(Floor *f) {
         return 0;
     }
 
-    place_traps(f->map, f->traps, f->h, f->w);
+    int ok = 0;
 
-    if (!find_free_cell(f->map, f->h, f->w, &f->hx, &f->hy)) {
+    if (find_free_cell(f->map, f->traps, f->h, f->w, &f->hx, &f->hy)) {
+        f->map[f->hy][f->hx] = CH_STAIRS_DOWN;
+
+        int tries = 0;
+        while (tries++ < 1000) {
+            if (!find_free_cell(f->map, f->traps, f->h, f->w, &f->ux, &f->uy))
+                break;
+            if (f->ux == f->hx && f->uy == f->hy) continue;
+            f->map[f->uy][f->ux] = CH_STAIRS_UP;
+            ok = 1;
+            break;
+        }
+    }
+
+    if (!ok) {
         free_traps(f->traps, f->h);
         free_map(f->map, f->h);
         f->map = NULL;
         f->traps = NULL;
         return 0;
     }
+
+    place_traps(f->map, f->traps, f->h, f->w);
     return 1;
 }
 
@@ -568,8 +605,8 @@ void adventure(void) {
     }
 
     int depth = 1;
-    printf("\n--- Приключение (этаж %d) ---\n", depth);
-    printf("Управление: W/A/S/D — шаг, Q — вернуться домой.\n");
+    printf("\n--- Башня (этаж %d) ---\n", depth);
+    printf("W/A/S/D — шаг, U — вверх (встань на U), Q — домой (только с D).\n");
 
     for (;;) {
         draw_map(f.map, f.h, f.w, f.hx, f.hy);
@@ -577,8 +614,12 @@ void adventure(void) {
 
         char dir = ask_dir();
         if (dir == 'q' || dir == 'Q') {
-            printf("Возвращаемся домой.\n");
-            break;
+            if (f.map[f.hy][f.hx] == CH_STAIRS_DOWN) {
+                printf("Возвращаемся домой.\n");
+                break;
+            }
+            printf("Выход только с лестницы вниз (D).\n");
+            continue;
         }
 
         int r = try_move(f.map, f.traps, f.h, f.w, &f.hx, &f.hy, dir);
@@ -591,7 +632,7 @@ void adventure(void) {
             printf("Туда нельзя: стена или препятствие.\n");
             continue;
         }
-        if (r == MOVE_COLLAPSE) {
+        if (r == MOVE_STAIRS_UP) {
             floor_destroy(&f);
             depth++;
             if (!floor_init(&f)) {
@@ -599,6 +640,22 @@ void adventure(void) {
                 return;
             }
             printf("\n--- Этаж %d ---\n", depth);
+            continue;
+        }
+        if (r == MOVE_COLLAPSE) {
+             floor_destroy(&f);
+             if (depth > 1) {
+                depth--;
+                if (!floor_init(&f)) {
+                    printf("[!] Не хватило памяти на этаж. Возврат домой.\n");
+                    return;
+            }
+            printf("\n--- Этаж %d ---\n", depth);
+        } else {
+                printf("Упал... и оказался дома\n");
+                break;
+            }
+            continue;
         }
     }
 
